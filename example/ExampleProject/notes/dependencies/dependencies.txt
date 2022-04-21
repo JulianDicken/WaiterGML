@@ -1,1 +1,4 @@
 #import JulianDicken/WaiterTest
+not an import
+#import an illegal import
+a
