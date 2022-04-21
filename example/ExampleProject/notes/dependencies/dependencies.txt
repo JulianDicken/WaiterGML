@@ -1,4 +1,3 @@
-#import JulianDicken/WaiterTest
-not an import
-#import an illegal import
-a
+/#import JulianDicken/WaiterTest
+/#import https://github.com/JulianDicken/WaiterTest
+#import https://speed.hetzner.de/100MB.bin
