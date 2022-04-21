@@ -9,11 +9,13 @@ fn main() -> std::io::Result<()> {
 
     for path in fs::read_dir(&note_dir).expect("unable to read note directory") {
         let note = path.expect("unable to read note");
-        let file = fs::File::open(note.path())?;
-        let mut buf_reader = io::BufReader::new(file);
-        let mut content = String::new();
-        buf_reader.read_to_string(&mut content).expect("error reading note contents");
-        println!("{}", content);
+        let note_path = format!("{:?}.txt", note.path());
+        //let file = fs::File::open(note.path())?;
+        print!("{:?}", note_path);
+        //let mut buf_reader = io::BufReader::new(file);
+        //let mut content = String::new();
+        //buf_reader.read_to_string(&mut content).expect("error reading note contents");
+        //println!("{}", content);
     }
     Ok(())
 } 
