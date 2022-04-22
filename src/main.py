@@ -1,4 +1,5 @@
 import argparse
+from curses import has_key
 import re as regex
 import requests
 import time
@@ -18,23 +19,14 @@ class STATEMENTS(Enum):
 def handle_url_import(dest_path, url, verbose=False):
     if (verbose):
         print(f"URL import found: {url}, attempting to resolve")
-    response = requests.get(url, allow_redirects=True, stream=True)
-    fname = ''
-    if "Content-Disposition" in response.headers.keys():
-        fname = regex.findall("filename=(.+)", response.headers["Content-Disposition"])[0]
-    else:
-        fname = url.split("/")[-1]
-    if (Path(fname).suffix != ".yymps"):
-        print(f"The file at the URL {url} is not a .yymps file, cancelling download")
-        return None
     path = Path(f"{dest_path}/temp/") 
     if (not path.is_dir):
         path.mkdir(exist_ok=True)
     path = path / fname
     path = path.resolve()
-    #if (Path(path).is_file):
-        #print(f"The package {fname} has already been downloaded, cancelling download.")
-        #return None
+    if (Path(path).is_file()):
+        print(f"The package {fname} already exists, cancelling download.")
+        return None
     
     start = time.time()
     with open(path, 'wb') as f:
@@ -58,14 +50,31 @@ def handle_url_import(dest_path, url, verbose=False):
         print(f">[DOWNLOADED] in {round(time.time()-start, 4)}s from: {url}")
     return path
 
-def handle_github_import(dest_path, github_identifier, verbose=False):
+def parse_url_import(url, verbose):
+    response = requests.get(url, allow_redirects=True, stream=True)
+    fname = ''
+    if "Content-Disposition" in response.headers.keys():
+        fname = regex.findall("filename=(.+)", response.headers["Content-Disposition"])[0]
+    else:
+        fname = url.split("/")[-1]
+    if (Path(fname).suffix != ".yymps"):
+        print(f"The file at the URL {url} is not a .yymps file, cancelling download")
+        return None
+    return url
+
+def parse_github_import(github_identifier, verbose=False):
     if (verbose):
         print(f"Github import {github_identifier} found, attempting to resolve")
     metadata_url = f"https://api.github.com/repos/{github_identifier}/releases/latest"
     metadata = requests.get(metadata_url, allow_redirects=True).json()
+    if (not metadata.get("assets", False)):
+        print(f"The github project {github_identifier} does not contain a release. Please contact the project author. Details can be found in this projects .readme")
+
+    urls = []
     for asset in metadata["assets"]:
         url = asset["browser_download_url"]
-        handle_url_import(dest_path, url, verbose)
+        urls.append( parse_url_import(url, verbose) )
+    return urls
 
 def uri_validator(x):
     try:
@@ -75,35 +84,36 @@ def uri_validator(x):
         return False
 
 def parse_imports(path, try_import_list, verbose=False):
-    handled_imports = []
+    parsed_imports = []
     for import_to_handle in try_import_list:
         import_to_handle = regex.sub(r"[\n\t\s]*", "", import_to_handle)
         is_github_iden = not regex.search("^[a-zA-Z0-9]+/[a-zA-Z0-9]+", import_to_handle) is None
         is_direct_link = uri_validator(import_to_handle)
-        print(is_github_iden, is_direct_link)
+        
         if (is_direct_link):
-            handled_imports.append(
-                handle_url_import(path, import_to_handle, verbose)
+            parsed_imports.append(
+                parse_url_import(import_to_handle, verbose)
             )
             continue
         if (is_github_iden):
-            handled_imports.append(
-                handle_github_import(path, import_to_handle, verbose)
+            parsed_imports.append(
+                parse_github_import(import_to_handle, verbose)
             )
             continue
         else:
             if (verbose):
                 print(f"Mismatched import: {import_to_handle}")
+    return parsed_imports
 
 
-def parse_dependency_file(dir, path, verbose=False):
-    unhandled_imports = [];
+def parse_dependency_file(path, verbose=False):
+    unparsed_imports = [];
     with open(path) as file:
         for line in file.readlines():
             match line[:1]:
                 case TOKENS.BEGIN_STATEMENT.value:
-                    unhandled_imports.append(line[8:])
-    parse_imports(dir, unhandled_imports, verbose)
+                    unparsed_imports.append(line[8:])
+    return unparsed_imports
 
 def parse_directory(dir, verbose=False):
     #is this a valid yyp directory ? 
@@ -124,15 +134,20 @@ def parse_directory(dir, verbose=False):
     if (verbose):
         print("Valid dependency file found, proceeding to parse dependencies")
 
-    parse_dependency_file(dir, path_to_dependencies, verbose)
+    return path_to_dependencies
 
 
 def main():
     parser = argparse.ArgumentParser();
+    parser.add_argument("-upgrade", "-upgrade", action="store_true")
     parser.add_argument("-verbose", "-verbose", action="store_true")
     parser.add_argument("-path", "-path", action="store", type=str)
     args = parser.parse_args()
-
-    parse_directory(args.path, args.verbose)
-
+    working_dir = args.dir
+    verbose = args.verbose
+    upgrade = args.upgrade
+    path_to_dependencies = parse_directory(working_dir, verbose)
+    unparsed_imports = parse_dependency_file(path_to_dependencies, verbose)
+    parsed_imports = parse_imports(working_dir, unparsed_imports, verbose)
+    print(parsed_imports)
 main()
