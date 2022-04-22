@@ -1,2 +1,4 @@
+#import https://speed.hetzner.de/100MB.bin
 #import JujuAdams/scribble
 #import sohomsahaun/SnowState
+#import JulianDicken/WaiterTest

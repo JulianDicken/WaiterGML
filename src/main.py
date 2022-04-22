@@ -1,13 +1,13 @@
 import argparse
-from curses import has_key
+from os import mkdir
 import re as regex
+from matplotlib.cbook import flatten
 import requests
 import time
 import pathlib
 from enum import Enum
 from pathlib import Path
 from urllib.parse import urlparse
-from clint.textui import progress
 
 class TOKENS(Enum):
     BEGIN_STATEMENT = "#"
@@ -16,25 +16,21 @@ class STATEMENTS(Enum):
     IMPORT_STATEMENT = "import"
 
 
-def handle_url_import(dest_path, url, verbose=False):
-    if (verbose):
-        print(f"URL import found: {url}, attempting to resolve")
-    path = Path(f"{dest_path}/temp/") 
-    if (not path.is_dir):
-        path.mkdir(exist_ok=True)
-    path = path / fname
-    path = path.resolve()
-    if (Path(path).is_file()):
-        print(f"The package {fname} already exists, cancelling download.")
-        return None
+def download_file_url(dest, url, verbose=False):
+    chunks_size = Path(dest).stat().st_size if Path(dest).is_file() else 0
+    resume_header = {'Range':f'bytes={chunks_size}-'}
     
+    response = requests.get(url, stream=True, headers=resume_header)
+    total_size = int(response.headers.get('content-length'))
+    if (chunks_size >= total_size):
+        print(f"Package from {url} already imported, skipping")
+        return
+
     start = time.time()
-    with open(path, 'wb') as f:
+    with open(dest, 'ab') as f:
         chunk_size = 4048;
         chunk_next_draw = 0;
         chunk_amount = 10;
-        chunks_size = 0;
-        total_size = int(response.headers.get('content-length'))
         chunk_incr = total_size / chunk_amount;
         for i in response.iter_content(chunk_size=chunk_size):
             chunks_size += len(i)
@@ -48,7 +44,7 @@ def handle_url_import(dest_path, url, verbose=False):
             f.write(i)
             f.flush()
         print(f">[DOWNLOADED] in {round(time.time()-start, 4)}s from: {url}")
-    return path
+    return dest
 
 def parse_url_import(url, verbose):
     response = requests.get(url, allow_redirects=True, stream=True)
@@ -60,7 +56,7 @@ def parse_url_import(url, verbose):
     if (Path(fname).suffix != ".yymps"):
         print(f"The file at the URL {url} is not a .yymps file, cancelling download")
         return None
-    return url
+    return (fname, url)
 
 def parse_github_import(github_identifier, verbose=False):
     if (verbose):
@@ -69,12 +65,11 @@ def parse_github_import(github_identifier, verbose=False):
     metadata = requests.get(metadata_url, allow_redirects=True).json()
     if (not metadata.get("assets", False)):
         print(f"The github project {github_identifier} does not contain a release. Please contact the project author. Details can be found in this projects .readme")
-
-    urls = []
-    for asset in metadata["assets"]:
-        url = asset["browser_download_url"]
-        urls.append( parse_url_import(url, verbose) )
-    return urls
+        return None
+    
+    url = metadata["assets"][0]["browser_download_url"]
+    url = parse_url_import(url, verbose)
+    return url
 
 def uri_validator(x):
     try:
@@ -143,11 +138,16 @@ def main():
     parser.add_argument("-verbose", "-verbose", action="store_true")
     parser.add_argument("-path", "-path", action="store", type=str)
     args = parser.parse_args()
-    working_dir = args.dir
+    working_dir = args.path
     verbose = args.verbose
     upgrade = args.upgrade
     path_to_dependencies = parse_directory(working_dir, verbose)
     unparsed_imports = parse_dependency_file(path_to_dependencies, verbose)
     parsed_imports = parse_imports(working_dir, unparsed_imports, verbose)
-    print(parsed_imports)
+    parsed_imports = list(filter(None, parsed_imports))
+    temp_dir = f"{working_dir}/temp"
+    for (fname, url) in parsed_imports:
+        path = f"{temp_dir}/{fname}"
+        download_file_url(path, url)
+
 main()
