@@ -1,3 +1,2 @@
-/#import JulianDicken/WaiterTest
-/#import https://github.com/JulianDicken/WaiterTest
-#import https://speed.hetzner.de/100MB.bin
+#import JujuAdams/scribble
+#import sohomsahaun/SnowState

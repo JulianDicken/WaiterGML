@@ -5,4 +5,4 @@ if "%IGOR_DEPENDENCIES%" == "1" (
 )
 set IGOR_DEPENDENCIES=1
 
-build-scripts\waiter\waiter_gml.exe %YYprojectDir%
+build-scripts\waiter\main.exe -p %YYprojectDir% -v
