@@ -49,7 +49,7 @@ fn main() -> std::io::Result<()> {
 
 fn handle_import(statement: &str) {
     let is_github_import = Regex::new(r"[a-zA-Z0-9]*/[a-zA-Z0-9]+").unwrap();
-    let is_url_import = Regex::new(r"[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)").unwrap();
+    let is_url_import = Regex::new(r"https?://(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)").unwrap();
     //let is_local_import = Regex::new(r"").unwrap(); we do this later
     if is_url_import.is_match(statement) {
         println!("{:?}",statement);
@@ -75,7 +75,6 @@ fn handle_url_import(url: &str) {
 async fn download_file_url(url: &str, packagename: &str) {
     download_file(&Client::new(), url, packagename).await.unwrap();
 }
-
 pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(), String> {
     let res = client
         .get(url)
@@ -89,8 +88,8 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::default_bar()
         .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.white/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
-        .progress_chars("#"));
-    pb.set_message("Downloading");
+        .progress_chars("█  "));
+    pb.set_message(&format!("Downloading {}", url));
 
     let mut file;
     let mut downloaded: u64 = 0;
@@ -124,6 +123,6 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
         pb.set_position(new);
     }
 
-    //pb.finish_with_message(&format!("Downloaded {} to {}", url, path));
+    pb.finish_with_message(&format!("Downloaded {} to {}", url, path));
     return Ok(());
 }
