@@ -7,7 +7,6 @@ use std::cmp::min;
 use std::fs::{File};
 use std::io::{Seek, Write};
 use reqwest::Client;
-use indicatif::{ProgressBar, ProgressStyle};
 use futures_util::StreamExt;
 
 fn main() -> std::io::Result<()> {
@@ -85,11 +84,7 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
         .content_length()
         .ok_or(format!("Failed to get content length from '{}'", &url))?;
 
-    let pb = ProgressBar::new(total_size);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.white/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
-        .progress_chars("█  "));
-    pb.set_message(&format!("Downloading {}", url));
+    println!("Downloading {}", url);
 
     let mut file;
     let mut downloaded: u64 = 0;
@@ -114,15 +109,20 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
     }
 
     println!("Commencing transfer");
+    let mut last_chunk = 0.0;
     while let Some(item) = stream.next().await {
         let chunk = item.or(Err(format!("Error while downloading file")))?;
         file.write(&chunk)
             .or(Err(format!("Error while writing to file")))?;
         let new = min(downloaded + (chunk.len() as u64), total_size);
         downloaded = new;
-        pb.set_position(new);
+        
+        let chunks = (new as f32 / total_size as f32) * 10.0;
+        if chunks > last_chunk + 1.0 {
+            last_chunk = chunks;
+            println!("[{}{}>] from {}", "#".repeat(chunks as usize), "-".repeat(10 - chunks as usize), url)
+        }
     }
-
-    pb.finish_with_message(&format!("Downloaded {} to {}", url, path));
+    println!("[{} ] Downloaded {}", "#".repeat(10), url);
     return Ok(());
 }
